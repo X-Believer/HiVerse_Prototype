@@ -14,6 +14,7 @@ public class UIManager : MonoBehaviour
     [Header("UI")]
     public GameObject hud;
     public GameObject settingsPanel;
+    public GameObject worldPanel;
     public GameObject backgroundMask;
 
     [Header("Player")]
@@ -21,6 +22,7 @@ public class UIManager : MonoBehaviour
     
     private ThirdPersonController _playerController;
     private TabView _settingsTabView;
+    private TabView _worldTabView;
 
     /// UI栈（后进先出）
     private Stack<GameObject> uiStack = new Stack<GameObject>();
@@ -30,6 +32,7 @@ public class UIManager : MonoBehaviour
         Instance = this;
 
         _settingsTabView = settingsPanel.GetComponent<TabView>();
+        _worldTabView = worldPanel.GetComponent<TabView>();
         _playerController = playerCharacter.GetComponent<ThirdPersonController>();
 
         backgroundMask.SetActive(false);
@@ -103,6 +106,28 @@ public class UIManager : MonoBehaviour
     public void CloseSettings()
     {
         CloseUI(settingsPanel);
+    }
+    
+    //================================================
+    // 打开WorldPanel指定页
+    //================================================
+
+    public void OpenWorldPanelTab(int index)
+    {
+        worldPanel.SetActive(true);
+        _worldTabView.CurrentIndex = index;
+
+        OpenUI(worldPanel);
+    }
+
+    public void OpenWorldPanel()
+    {
+        OpenUI(worldPanel);
+    }
+
+    public void CloseWorldPanel()
+    {
+        CloseUI(worldPanel);
     }
 
     //================================================
