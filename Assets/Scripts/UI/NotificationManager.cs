@@ -1,40 +1,71 @@
+using RainbowArt.CleanFlatUI;
 using UnityEngine;
 
 public class NotificationManager : MonoBehaviour
 {
     public static NotificationManager Instance;
 
-    [Header("Parent")]
-    public Transform notificationRoot;
-
-    [Header("Prefabs")]
-    public GameObject toastPrefab;
-    public GameObject messagePrefab;
-    public GameObject confirmPrefab;
+    [Header("Notifications")]
+    public GameObject toastObject;
+    public GameObject messageObject;
+    public GameObject confirmObject;
+    
+    private NotificationContentFitterWithButton _toast;
+    private NotificationContentFitterWithButton _message;
+    private NotificationContentFitterWithButton _confirm;
 
     void Awake()
     {
         Instance = this;
+        // _toast = toastObject.GetComponent<NotificationContentFitterWithButton>();
+        // _message = messageObject.GetComponent<NotificationContentFitterWithButton>();
+        _confirm = confirmObject.GetComponent<NotificationContentFitterWithButton>();
     }
 
-    public void ShowToast(string message)
+    public void ShowToast(string msg)
     {
-        GameObject obj = Instantiate(toastPrefab, notificationRoot);
-        // obj.GetComponent<ToastNotification>().Init(message);
+        _toast.DescriptionValue = msg;
+        _toast.ShowNotification();
+        UIManager.Instance.OpenUI(toastObject);
     }
 
-    public void ShowMessage(string title, string message)
+    public void ShowMessage(string title, string msg)
     {
-        GameObject obj = Instantiate(messagePrefab, notificationRoot);
-        // obj.GetComponent<MessageNotification>().Init(title, message);
+        _message.TitleValue = title;
+        _message.DescriptionValue = msg;
+        _message.ShowNotification();
+        UIManager.Instance.OpenUI(messageObject);
     }
 
-    public void ShowConfirm(string title, string message,
-        System.Action onConfirm,
-        System.Action onCancel = null)
+    public void ShowConfirm(string title, string msg, System.Action onConfirm, System.Action onCancel)
     {
-        GameObject obj = Instantiate(confirmPrefab, notificationRoot);
+        _confirm.TitleValue = title;
+        _confirm.DescriptionValue = msg;
 
-        // obj.GetComponent<ConfirmNotification>().Init(title, message, onConfirm, onCancel);
+        // 清理旧事件
+        _confirm.OnFirst.RemoveAllListeners();
+        _confirm.OnCancel.RemoveAllListeners();
+
+        // 重新绑定
+        _confirm.OnFirst.AddListener(() =>
+        {
+            onCancel?.Invoke();
+            HideConfirm();
+        });
+
+        _confirm.OnSecond.AddListener(() =>
+        {
+            onConfirm?.Invoke();
+        });
+
+        _confirm.ShowTime = 999f;
+        _confirm.ShowNotification();
+        UIManager.Instance.OpenUI(confirmObject);
+    }
+
+    public void HideConfirm()
+    {
+        UIManager.Instance.CloseUI(confirmObject);
+        // _confirm.HideNotification();
     }
 }

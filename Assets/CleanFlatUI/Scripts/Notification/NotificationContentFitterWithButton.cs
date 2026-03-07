@@ -295,7 +295,7 @@ namespace RainbowArt.CleanFlatUI
             InitButtons();
             InitAnimation();
             UpdateHeight();                 
-            UpdatePosition();
+            // UpdatePosition();
             PlayAnimation(true); 
             StartTransition(true);
         }

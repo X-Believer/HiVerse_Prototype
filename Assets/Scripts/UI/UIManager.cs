@@ -1,5 +1,6 @@
 using RainbowArt.CleanFlatUI;
 using StarterAssets;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class UIManager : MonoBehaviour
@@ -7,52 +8,115 @@ public class UIManager : MonoBehaviour
     public const int TAB_USER = 0;
     public const int TAB_SETTINGS = 1;
     public const int TAB_AGENT = 2;
-    
+
     public static UIManager Instance;
 
+    [Header("UI")]
     public GameObject hud;
     public GameObject settingsPanel;
+    public GameObject backgroundMask;
+
+    [Header("Player")]
     public GameObject playerCharacter;
+    
     private ThirdPersonController _playerController;
     private TabView _settingsTabView;
 
-    bool menuOpen = false;
+    /// UI栈（后进先出）
+    private Stack<GameObject> uiStack = new Stack<GameObject>();
 
     void Awake()
     {
         Instance = this;
+
         _settingsTabView = settingsPanel.GetComponent<TabView>();
         _playerController = playerCharacter.GetComponent<ThirdPersonController>();
+
+        backgroundMask.SetActive(false);
     }
-    
+
+    //================================================
+    // 打开UI
+    //================================================
+
+    public void OpenUI(GameObject panel)
+    {
+        if (!panel.activeSelf)
+            panel.SetActive(true);
+
+        uiStack.Push(panel);
+
+        OnMenuOpened();
+    }
+
+    //================================================
+    // 关闭UI
+    //================================================
+
+    public void CloseUI(GameObject panel)
+    {
+        if (!panel.activeSelf)
+            return;
+
+        panel.SetActive(false);
+
+        if (uiStack.Count > 0 && uiStack.Peek() == panel)
+        {
+            uiStack.Pop();
+        }
+
+        OnMenuClosed();
+    }
+
+    //================================================
+    // 关闭最上层UI（用于点击空白区域）
+    //================================================
+
+    public void CloseTopUI()
+    {
+        if (uiStack.Count == 0)
+            return;
+
+        GameObject top = uiStack.Pop();
+        top.SetActive(false);
+
+        OnMenuClosed();
+    }
+
+    //================================================
+    // 打开Settings指定页
+    //================================================
+
     public void OpenSettingsTab(int index)
     {
         settingsPanel.SetActive(true);
         _settingsTabView.CurrentIndex = index;
 
-        OnMenuOpened();
+        OpenUI(settingsPanel);
     }
 
     public void OpenSettings()
     {
-        settingsPanel.SetActive(true);
-        OnMenuOpened();
+        OpenUI(settingsPanel);
     }
 
     public void CloseSettings()
     {
-        settingsPanel.SetActive(false);
-        OnMenuClosed();
+        CloseUI(settingsPanel);
     }
 
-    public void OnMenuOpened()
+    //================================================
+    // UI状态控制
+    //================================================
+
+    void OnMenuOpened()
     {
-        menuOpen = true;
+        backgroundMask.SetActive(true);
 
         // 禁用角色控制
         _playerController.enabled = false;
 
-        // 禁用HUD交互
+        // 禁用HUD
         SetHUDInteractable(false);
 
         // 显示鼠标
@@ -60,22 +124,56 @@ public class UIManager : MonoBehaviour
         Cursor.visible = true;
     }
 
-    public void OnMenuClosed()
+    void OnMenuClosed()
     {
-        menuOpen = false;
+        if (uiStack.Count == 0)
+        {
+            backgroundMask.SetActive(false);
 
-        _playerController.enabled = true;
+            // 恢复角色控制
+            _playerController.enabled = true;
 
-        SetHUDInteractable(true);
+            SetHUDInteractable(true);
+
+            // Cursor.lockState = CursorLockMode.Locked;
+            // Cursor.visible = false;
+        }
     }
 
     void SetHUDInteractable(bool value)
     {
         CanvasGroup group = hud.GetComponent<CanvasGroup>();
-        group.interactable = value;
-        group.blocksRaycasts = value;
+
+        if (group != null)
+        {
+            group.interactable = value;
+            group.blocksRaycasts = value;
+        }
     }
-    
+
+    //================================================
+    // 背景点击
+    //================================================
+
+    public void OnBackgroundClicked()
+    {
+        CloseTopUI();
+    }
+
+    //================================================
+    // 退出游戏
+    //================================================
+
+    public void OnExitButtonClicked()
+    {
+        NotificationManager.Instance.ShowConfirm(
+            "Exit Game",
+            "Are you sure you want to quit?",
+            QuitGame,
+            null
+        );
+    }
+
     public void QuitGame()
     {
         Debug.Log("Quit Game");
@@ -83,7 +181,7 @@ public class UIManager : MonoBehaviour
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;
 #else
-    Application.Quit();
+        Application.Quit();
 #endif
     }
 }
