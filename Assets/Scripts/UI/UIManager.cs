@@ -5,17 +5,20 @@ using UnityEngine;
 
 public class UIManager : MonoBehaviour
 {
-    public const int TAB_USER = 0;
-    public const int TAB_SETTINGS = 1;
-    public const int TAB_AGENT = 2;
-
     public static UIManager Instance;
 
-    [Header("UI")]
+    [Header("GeneralUI")]
     public GameObject hud;
     public GameObject settingsPanel;
     public GameObject worldPanel;
     public GameObject backgroundMask;
+    
+    [Header("World UI")]
+    public RectTransform worldCanvas;
+    public WorldMarker markerPrefab;
+    public Tooltip tooltip;
+    
+    private List<WorldMarker> markers = new List<WorldMarker>();
 
     [Header("Player")]
     public GameObject playerCharacter;
@@ -24,7 +27,7 @@ public class UIManager : MonoBehaviour
     private TabView _settingsTabView;
     private TabView _worldTabView;
 
-    /// UI栈（后进先出）
+    /// UI栈
     private Stack<GameObject> uiStack = new Stack<GameObject>();
 
     void Awake()
@@ -36,6 +39,25 @@ public class UIManager : MonoBehaviour
         _playerController = playerCharacter.GetComponent<ThirdPersonController>();
 
         backgroundMask.SetActive(false);
+    }
+    
+    void OnEnable()
+    {
+        CameraManager.OnCameraModeChanged += OnCameraModeChanged;
+    }
+
+    void OnDisable()
+    {
+        CameraManager.OnCameraModeChanged -= OnCameraModeChanged;
+    }
+
+    
+    void Update()
+    {
+        if (CameraManager.Instance.cameraMode == CameraMode.TopDown)
+        {
+            UpdateTooltipPosition();
+        }
     }
 
     //================================================
@@ -174,6 +196,90 @@ public class UIManager : MonoBehaviour
             group.interactable = value;
             group.blocksRaycasts = value;
         }
+    }
+    
+    
+    //================================================
+    // Topdown Marker 控制
+    //================================================
+    public void RegisterMarker(WorldMarker marker)
+    {
+        if (!markers.Contains(marker))
+        {
+            markers.Add(marker);
+        }
+    }
+
+    public void UnregisterMarker(WorldMarker marker)
+    {
+        if (markers.Contains(marker))
+        {
+            markers.Remove(marker);
+        }
+    }
+
+    private void OnCameraModeChanged(CameraMode mode)
+    {
+        bool active = mode == CameraMode.TopDown;
+
+        foreach (var marker in markers)
+        {
+            marker.SetVisible(active);
+        }
+    }
+    
+    void UpdateTooltipPosition()
+    {
+        if (tooltip != null && tooltip.gameObject.activeSelf)
+        {
+            tooltip.SetTooltipPosition(Input.mousePosition, 0, 0);
+        }
+    }
+    
+    public WorldMarker CreateMarker(Transform target, string name, Sprite icon, Vector3 offset)
+    {
+        if (markerPrefab == null || worldCanvas == null)
+        {
+            Debug.LogWarning("WorldUI not configured.");
+            return null;
+        }
+
+        WorldMarker marker = Instantiate(markerPrefab, worldCanvas);
+
+        marker.Init(target, name, icon, offset);
+
+        markers.Add(marker);
+
+        return marker;
+    }
+    
+    public void RemoveMarker(WorldMarker marker)
+    {
+        if (marker == null)
+            return;
+
+        if (markers.Contains(marker))
+            markers.Remove(marker);
+
+        Destroy(marker.gameObject);
+    }
+    
+    public void ShowTooltip(string text, Vector3 pos)
+    {
+        if (tooltip == null)
+            return;
+
+        tooltip.DescriptionValue = text;
+        tooltip.SetTooltipPosition(pos, 0, 0);
+        tooltip.ShowTooltip();
+    }
+
+    public void HideTooltip()
+    {
+        if (tooltip == null)
+            return;
+
+        tooltip.HideTooltip();
     }
 
     //================================================

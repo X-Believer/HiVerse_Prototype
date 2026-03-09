@@ -4,24 +4,69 @@ using HiVerse.AI;
 
 public class NPCController : MonoBehaviour
 {
-    public NPCSchedule schedule;      // 指向 ScriptableObject
+    [SerializeField]
+    private string npcName;
+    public string Name => npcName;
+    
+    private string job;
+    
+    [Header("Schedule")]
+    public NPCSchedule schedule;
+
     private NavMeshAgent agent;
+    private Outline outline;
 
     void Awake()
     {
         agent = GetComponent<NavMeshAgent>();
+        outline = GetComponentInChildren<Outline>();
+
+        if (outline != null)
+        {
+            outline.enabled = false;
+        }
     }
 
     void Update()
     {
-        // 这里可以加时间匹配逻辑
+        UpdateSchedule();
+    }
+
+    // ======================
+    // 日程系统
+    // ======================
+
+    void UpdateSchedule()
+    {
+        if (schedule == null)
+            return;
+
         foreach (var item in schedule.dailyPlan)
         {
-            // 示例：当前时间匹配，执行移动
-            if(item.hour == WorldClock.CurrentHour && item.minute == WorldClock.CurrentMinute)
-            {
-                agent.SetDestination(item.target.position);
-            }
+            
         }
+    }
+
+    // ======================
+    // 鼠标高亮
+    // ======================
+
+    public void Highlight(bool enable)
+    {
+        if (outline != null)
+        {
+            outline.enabled = enable;
+        }
+    }
+
+    // ======================
+    // 交互
+    // ======================
+
+    public void OnClick()
+    {
+        Debug.Log("Interact with NPC: " + name);
+
+        UIManager.Instance.OpenWorldPanelTab(0);
     }
 }

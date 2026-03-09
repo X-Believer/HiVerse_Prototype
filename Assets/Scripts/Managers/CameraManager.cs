@@ -1,7 +1,15 @@
+using System;
 using StarterAssets;
 using UnityEngine;
 using System.Collections;
 using Cinemachine;
+
+public enum CameraMode
+{
+    PlayerFollow,
+    NPC,
+    TopDown
+}
 
 public class CameraManager : MonoBehaviour
 {
@@ -34,6 +42,10 @@ public class CameraManager : MonoBehaviour
     private Transform topDownPivot;
     private bool isTopDownTransitioning = false;
     
+    public CameraMode cameraMode { get; private set; }
+    
+    public static event Action<CameraMode> OnCameraModeChanged;
+    
     public static CameraManager Instance;
 
     private void Awake()
@@ -48,6 +60,7 @@ public class CameraManager : MonoBehaviour
         activeCamera = playerFollowCamera;
         playerFollowCamera.Follow = playerCameraRoot.transform;
         SetActiveCamera(activeCamera);
+        cameraMode = CameraMode.PlayerFollow;
 
         // 创建 TopDownPivot 用于自由移动
         topDownPivot = new GameObject("TopDownPivot").transform;
@@ -133,6 +146,19 @@ public class CameraManager : MonoBehaviour
 
         if (_playerController != null)
             _playerController.enabled = (cam == playerFollowCamera);
+
+        CameraMode newMode = cameraMode;
+
+        if (cam == playerFollowCamera) newMode = CameraMode.PlayerFollow;
+        else if (cam == npcCamera) newMode = CameraMode.NPC;
+        else if (cam == topDownCamera) newMode = CameraMode.TopDown;
+
+        if (newMode != cameraMode)
+        {
+            cameraMode = newMode;
+            OnCameraModeChanged?.Invoke(cameraMode);
+        }
+
     }
 
     public void SwitchToPlayerCamera()
