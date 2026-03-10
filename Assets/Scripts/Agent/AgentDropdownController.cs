@@ -5,51 +5,49 @@ using TMPro;
 public class AgentDropdownController : MonoBehaviour
 {
     private TMP_Dropdown _agentDropdown;
-
     private List<Transform> _agentList = new List<Transform>();
-    
+
     private void Awake()
     {
         _agentDropdown = GetComponent<TMP_Dropdown>();
     }
+
+    private void OnEnable()
+    {
+        NPCManager.OnNPCListChanged += RefreshAgentList;
+    }
+
+    private void OnDisable()
+    {
+        NPCManager.OnNPCListChanged -= RefreshAgentList;
+    }
+
     private void Start()
     {
-        RefreshAgentList();
-        
-        // Dropdown 事件监听
         _agentDropdown.onValueChanged.AddListener(OnAgentSelected);
     }
 
-    /// <summary>
-    /// 刷新所有 Agent 名称到 Dropdown
-    /// </summary>
-    public void RefreshAgentList()
+    public void RefreshAgentList(List<NPCController> npcList)
     {
         _agentDropdown.ClearOptions();
         _agentList.Clear();
 
-        GameObject[] agents = GameObject.FindGameObjectsWithTag("Agent");
-        List<string> agentNames = new List<string>();
-        
-        agentNames.Add("You");
+        List<string> names = new List<string> { "You" };
 
-        foreach (GameObject Agent in agents)
+        foreach (var npc in npcList)
         {
-            _agentList.Add(Agent.transform);
-            agentNames.Add(Agent.name);
+            _agentList.Add(npc.transform);
+            names.Add(npc.name);
         }
 
-        _agentDropdown.AddOptions(agentNames);
+        _agentDropdown.AddOptions(names);
     }
 
-    /// <summary>
-    /// Dropdown 选中 Agent
-    /// </summary>
-    /// <param name="oldIndex"></param>
     private void OnAgentSelected(int oldIndex)
     {
         int index = _agentDropdown.value;
-        if (index < 0 || index >= _agentList.Count + 1) return;
+        if (index < 0 || index > _agentList.Count) return;
+
         if (index == 0)
         {
             CameraManager.Instance.SwitchToPlayerCamera();

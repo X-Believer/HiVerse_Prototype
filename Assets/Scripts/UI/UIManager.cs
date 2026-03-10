@@ -2,6 +2,7 @@ using RainbowArt.CleanFlatUI;
 using StarterAssets;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public class UIManager : MonoBehaviour
 {
@@ -16,7 +17,7 @@ public class UIManager : MonoBehaviour
     [Header("World UI")]
     public RectTransform worldCanvas;
     public WorldMarker markerPrefab;
-    public Tooltip tooltip;
+    public Tooltip topdownTip;
     
     private List<WorldMarker> markers = new List<WorldMarker>();
 
@@ -56,7 +57,7 @@ public class UIManager : MonoBehaviour
     {
         if (CameraManager.Instance.cameraMode == CameraMode.TopDown)
         {
-            UpdateTooltipPosition();
+            UpdateTopdownTipPosition();
         }
     }
 
@@ -228,11 +229,11 @@ public class UIManager : MonoBehaviour
         }
     }
     
-    void UpdateTooltipPosition()
+    void UpdateTopdownTipPosition()
     {
-        if (tooltip != null && tooltip.gameObject.activeSelf)
+        if (topdownTip != null && topdownTip.gameObject.activeSelf)
         {
-            tooltip.SetTooltipPosition(Input.mousePosition, 0, 0);
+            topdownTip.SetTooltipPosition(Input.mousePosition, 0, 0);
         }
     }
     
@@ -264,22 +265,33 @@ public class UIManager : MonoBehaviour
         Destroy(marker.gameObject);
     }
     
-    public void ShowTooltip(string text, Vector3 pos)
+    public void ShowTooltip(string text, Vector2 screenPos)
     {
-        if (tooltip == null)
+        if (topdownTip == null)
             return;
 
-        tooltip.DescriptionValue = text;
-        tooltip.SetTooltipPosition(pos, 0, 0);
-        tooltip.ShowTooltip();
+        topdownTip.DescriptionValue = text;
+
+        RectTransform canvasRect = worldCanvas;
+
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            canvasRect,
+            screenPos,
+            Camera.main,
+            out Vector2 localPoint
+        );
+
+        topdownTip.SetTooltipPosition(localPoint, 0, 0);
+
+        topdownTip.ShowTooltip();
     }
 
     public void HideTooltip()
     {
-        if (tooltip == null)
+        if (topdownTip == null)
             return;
 
-        tooltip.HideTooltip();
+        topdownTip.HideTooltip();
     }
 
     //================================================

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -9,12 +10,22 @@ public class NPCManager : MonoBehaviour
     public GameObject npcPrefab;
 
     private List<NPCController> npcs = new List<NPCController>();
-
     private NPCController currentNPC;
+
+    // ======================
+    // 事件
+    // ======================
+    public static event Action<NPCController> OnNPCSpawned;
+    public static event Action<NPCController> OnNPCRemoved;
+    public static event Action<NPCController> OnCurrentNPCChanged;
+    public static event Action<List<NPCController>> OnNPCListChanged;
 
     void Awake()
     {
-        Instance = this;
+        if (Instance == null)
+            Instance = this;
+        else
+            Destroy(gameObject);
     }
 
     void Update()
@@ -25,7 +36,6 @@ public class NPCManager : MonoBehaviour
     // ======================
     // 鼠标检测
     // ======================
-
     void DetectMouseNPC()
     {
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
@@ -43,6 +53,8 @@ public class NPCManager : MonoBehaviour
 
                     currentNPC = npc;
                     currentNPC.Highlight(true);
+
+                    OnCurrentNPCChanged?.Invoke(currentNPC);
                 }
 
                 if (Input.GetMouseButtonDown(0))
@@ -63,17 +75,17 @@ public class NPCManager : MonoBehaviour
         {
             currentNPC.Highlight(false);
             currentNPC = null;
+
+            OnCurrentNPCChanged?.Invoke(null);
         }
     }
 
     // ======================
     // NPC生成
     // ======================
-
     public NPCController SpawnNPC(Vector3 position)
     {
         GameObject obj = Instantiate(npcPrefab, position, Quaternion.identity);
-
         NPCController npc = obj.GetComponent<NPCController>();
 
         if (npc != null)
@@ -89,49 +101,49 @@ public class NPCManager : MonoBehaviour
     }
 
     // ======================
-    // 删除NPC
+    // 注册 / 注销 NPC
     // ======================
-
-    public void RemoveNPC(NPCController npc)
-    {
-        if (npc == null) return;
-
-        if (npcs.Contains(npc))
-        {
-            npcs.Remove(npc);
-        }
-
-        Destroy(npc.gameObject);
-    }
-
-    // ======================
-    // 注册NPC
-    // ======================
-
     public void RegisterNPC(NPCController npc)
     {
         if (npc != null && !npcs.Contains(npc))
         {
             npcs.Add(npc);
+
+            OnNPCSpawned?.Invoke(npc);
+            OnNPCListChanged?.Invoke(npcs);
         }
     }
-
-    // ======================
-    // 注销NPC
-    // ======================
 
     public void UnregisterNPC(NPCController npc)
     {
         if (npc != null && npcs.Contains(npc))
         {
             npcs.Remove(npc);
+
+            OnNPCRemoved?.Invoke(npc);
+            OnNPCListChanged?.Invoke(npcs);
         }
     }
 
     // ======================
-    // 获取NPC列表
+    // 删除 NPC
     // ======================
+    public void RemoveNPC(NPCController npc)
+    {
+        if (npc == null) return;
 
+        if (npcs.Contains(npc))
+            npcs.Remove(npc);
+
+        OnNPCRemoved?.Invoke(npc);
+        OnNPCListChanged?.Invoke(npcs);
+
+        Destroy(npc.gameObject);
+    }
+
+    // ======================
+    // 获取 NPC 列表
+    // ======================
     public List<NPCController> GetAllNPCs()
     {
         return npcs;
