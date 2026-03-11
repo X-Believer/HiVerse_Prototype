@@ -3,7 +3,7 @@ using UnityEngine.UI;
 using TMPro;
 using System;
 
-public class TimeUIController : MonoBehaviour
+public class TimePanelController : MonoBehaviour
 {
     public TMP_Text timeText;
     public TMP_Dropdown dayDropdown;
@@ -80,5 +80,6 @@ public class TimeUIController : MonoBehaviour
     void OnSpeedChanged(float value)
     {
         WorldClock.Instance.SetTimeSpeed((TimeSpeed)value);
+        NPCManager.Instance.SetNPCSpeed((NPCSpeed)value);
     }
 }

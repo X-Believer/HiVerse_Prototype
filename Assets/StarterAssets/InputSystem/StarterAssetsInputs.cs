@@ -18,12 +18,25 @@ namespace StarterAssets
 
 		[Header("Mouse Cursor Settings")]
 		public bool cursorLocked = false;
-		public bool cursorInputForLook = true;
+		public bool cursorInputForLook = false;
 
 #if ENABLE_INPUT_SYSTEM
 		public void OnMove(InputValue value)
 		{
 			MoveInput(value.Get<Vector2>());
+		}
+		
+		void Update()
+		{
+			if (Input.GetKeyDown(KeyCode.LeftAlt) || Input.GetKeyDown(KeyCode.RightAlt))
+			{
+				bool newState = !cursorLocked;
+
+				cursorLocked = newState;
+				cursorInputForLook = newState;
+
+				SetCursorState(cursorLocked);
+			}
 		}
 
 		public void OnLook(InputValue value)

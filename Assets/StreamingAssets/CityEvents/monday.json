@@ -1,9 +1,9 @@
 {
   "events": [
     {
-      "eventName": "Morning Market",
-      "eventDescription": "居民在市场进行早市交易",
-      "buildingName": "Office_01",
+      "eventName": "Start Simulation!",
+      "eventDescription": "市政厅开始了模拟城市研究，智能体们有了自己的人格",
+      "buildingName": "CityHall",
       "startTime": 540,
       "endTime": 660,
       "capacity": 20

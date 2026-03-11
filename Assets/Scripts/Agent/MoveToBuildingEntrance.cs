@@ -53,13 +53,7 @@ public class MoveToBuildingEntrance : Action
         NavMeshHit hit;
         if (NavMesh.SamplePosition(TargetEntrance.transform.position, out hit, 2f, NavMesh.AllAreas))
         {
-            _navMeshAgent.SetDestination(hit.position);
-            Debug.Log(
-                $"onNavMesh:{_navMeshAgent.isOnNavMesh} " +
-                $"hasPath:{_navMeshAgent.hasPath} " +
-                $"remaining:{_navMeshAgent.remainingDistance} " +
-                $"velocity:{_navMeshAgent.velocity}"
-            );
+            bool result = _navMeshAgent.SetDestination(TargetEntrance.transform.position);
         }
     }
 

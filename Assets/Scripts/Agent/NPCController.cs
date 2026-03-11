@@ -5,6 +5,7 @@ using UnityEngine.AI;
 using System.IO;
 using Opsive.BehaviorDesigner.Runtime;
 using Opsive.BehaviorDesigner;
+using Opsive.GraphDesigner.Runtime.Variables;
 
 public class NPCController : MonoBehaviour
 {
@@ -18,6 +19,7 @@ public class NPCController : MonoBehaviour
     private string currentActionDescription;
     
     private NavMeshAgent agent;
+    private Animator animator;
     private BehaviorTree behaviorTree;
     private bool isMovingToTarget = false;
     private string currentTargetBuilding;
@@ -30,6 +32,7 @@ public class NPCController : MonoBehaviour
         agent = GetComponent<NavMeshAgent>();
         outline = GetComponentInChildren<Outline>();
         behaviorTree = GetComponent<BehaviorTree>();
+        animator = GetComponent<Animator>();
 
         if (outline != null)
         {
@@ -64,6 +67,9 @@ public class NPCController : MonoBehaviour
     void Update()
     {
         UpdateSchedule();
+        float speed = agent.velocity.magnitude;
+        animator.SetFloat("Speed", speed);
+        animator.SetFloat("MotionSpeed",1);
     }
 
     // ======================
@@ -105,14 +111,19 @@ public class NPCController : MonoBehaviour
 
         if (item.target != null)
         {
-            // 设置行为树黑板变量
-            behaviorTree.SetVariableValue("TargetBuildingName", item.target);
-            behaviorTree.SetVariableValue("CurrentTask", item.action);
+            // 重置 NavMeshAgent
+            agent.isStopped = false;
+            agent.ResetPath();
 
-            // 启动行为树
+            // 更新行为树黑板变量
+            if (behaviorTree.GetVariable("TargetBuildingName") is SharedVariable<string> targetVar) targetVar.Value = item.target;
+
+            if (behaviorTree.GetVariable("CurrentTask") is SharedVariable<string> taskVar) taskVar.Value = item.action;
+
+            // 启用行为树
             behaviorTree.enabled = true;
         }
-        
+
         Debug.Log($"{npcName} 开始前往: {item.action}");
     }
     public string GetCurrentActionDescription()
@@ -126,8 +137,8 @@ public class NPCController : MonoBehaviour
         if (currentTask != null)
         {
             // 更新建筑内部列表
-            var entrance = GameObject.FindObjectsOfType<BuildingEntrance>();
-            foreach (var e in entrance)
+            var entrances = GameObject.FindObjectsOfType<BuildingEntrance>();
+            foreach (var e in entrances)
             {
                 if (e.building.buildingName == currentTask.target)
                 {
@@ -140,7 +151,11 @@ public class NPCController : MonoBehaviour
             currentTask = null;
         }
 
-        // 禁用行为树，等待下一次日程触发
+        // 清理 Agent 状态，保证下一次移动
+        agent.isStopped = true;
+        agent.ResetPath();
+
+        // 等待下一次日程触发
         behaviorTree.enabled = false;
     }
     
@@ -240,6 +255,11 @@ public class NPCController : MonoBehaviour
         Debug.Log("Interact with NPC: " + name);
 
         UIManager.Instance.OpenWorldPanelTab(0);
+    }
+    
+    public void OnFootstep()
+    {
+        
     }
     
     // ======================

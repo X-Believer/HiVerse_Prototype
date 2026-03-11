@@ -1,6 +1,14 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.AI;
+
+public enum NPCSpeed
+{
+    Slow = 1,
+    Normal = 2,
+    Fast = 3
+}
 
 public class NPCManager : MonoBehaviour
 {
@@ -8,6 +16,9 @@ public class NPCManager : MonoBehaviour
 
     [Header("NPC Prefab")]
     public GameObject npcPrefab;
+
+    public Vector3 NPCStartPosition;
+    public NPCSpeed NPCSpeed = NPCSpeed.Normal;
 
     private List<NPCController> npcs = new List<NPCController>();
     private NPCController currentNPC;
@@ -26,6 +37,16 @@ public class NPCManager : MonoBehaviour
             Instance = this;
         else
             Destroy(gameObject);
+    }
+    
+    void OnEnable()
+    {
+        WorldClock.OnDayChanged += ResetNPCPosition;
+    }
+
+    void OnDisable()
+    {
+        WorldClock.OnDayChanged -= ResetNPCPosition;
     }
 
     void Update()
@@ -147,5 +168,57 @@ public class NPCManager : MonoBehaviour
     public List<NPCController> GetAllNPCs()
     {
         return npcs;
+    }
+    
+    // ======================
+    // 重置 NPC 位置
+    // ======================
+    public void ResetNPCPosition()
+    {
+        for (int i = 0; i < npcs.Count; i++)
+        {
+            int row = i / 5;
+            int col = i % 5;
+
+            Vector3 pos = NPCStartPosition + new Vector3(col * 2, 0, row * 2);
+            npcs[i].transform.position = pos;
+
+            // 重置NavMeshAgent状态
+            NavMeshAgent agent = npcs[i].GetComponent<NavMeshAgent>();
+            if (agent != null)
+            {
+                agent.Warp(pos); // 瞬间移动到目标，不会被NavMesh阻挡
+                agent.ResetPath(); // 清除原来的路径
+                agent.isStopped = true;
+            }
+        }
+    }
+    
+    float GetNPCSpeed()
+    {
+        switch (NPCSpeed)
+        {
+            case NPCSpeed.Slow: return 3;
+            case NPCSpeed.Normal: return 4;
+            case NPCSpeed.Fast: return 6;
+        }
+
+        return 3f;
+    }
+    
+    public void SetNPCSpeed(NPCSpeed speed)
+    {
+        NPCSpeed = speed;
+        foreach (var npc in npcs)
+        {
+            if (npc != null)
+            {
+                NavMeshAgent agent = npc.GetComponent<NavMeshAgent>();
+                if (agent != null)
+                {
+                    agent.speed = GetNPCSpeed();
+                }
+            }
+        }
     }
 }

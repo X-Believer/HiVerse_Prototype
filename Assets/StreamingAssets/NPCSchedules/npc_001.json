@@ -5,15 +5,29 @@
         "hour": 8,
         "minute": 0,
         "action": "GoToWork",
-        "target": "Office_01",
-        "duration": 480
+        "target": "CityHall",
+        "duration": 60
       },
       {
-        "hour": 12,
+        "hour": 9,
         "minute": 0,
         "action": "Lunch",
-        "target": "Cafe_01",
+        "target": "Restaurant",
         "duration": 60
+      },
+      {
+        "hour": 13,
+        "minute": 0,
+        "action": "Relax",
+        "target": "Park",
+        "duration": 300
+      },
+      {
+        "hour": 18,
+        "minute": 0,
+        "action": "Go Home",
+        "target": "Residence",
+        "duration": 300
       }
     ],
     "Tuesday": [
