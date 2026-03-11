@@ -1,0 +1,20 @@
+{
+  "events": [
+    {
+      "eventName": "Morning Market",
+      "eventDescription": "居民在市场进行早市交易",
+      "buildingName": "Office_01",
+      "startTime": 540,
+      "endTime": 660,
+      "capacity": 20
+    },
+    {
+      "eventName": "Library Study",
+      "eventDescription": "居民在图书馆学习",
+      "buildingName": "Library",
+      "startTime": 840,
+      "endTime": 960,
+      "capacity": 10
+    }
+  ]
+}

@@ -28,7 +28,6 @@ public class SkyboxController : MonoBehaviour
 
         // 计算当前时间比例
         float t = WorldClock.Instance.CurrentHour + WorldClock.Instance.CurrentMinute / 60f;
-        if (WorldClock.Instance.CurrentMinute == 0) t += 1f;
         dnc.Time = t;
         
     }

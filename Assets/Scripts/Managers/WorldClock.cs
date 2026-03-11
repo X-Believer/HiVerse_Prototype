@@ -3,10 +3,10 @@ using UnityEngine;
 
 public enum TimePeriod
 {
-    Night,      // 0-5
-    Morning,    // 6-11
-    Afternoon,  // 12-17
-    Evening     // 18-23
+    Night,
+    Morning,
+    Afternoon,
+    Evening
 }
 
 public enum TimeSpeed
@@ -21,11 +21,9 @@ public class WorldClock : MonoBehaviour
     public static WorldClock Instance;
 
     [Header("时间设置")]
-    [Tooltip("每天开始时间的小时")]
     [Range(0, 23)]
     public int startHour = 8;
 
-    [Tooltip("每天开始时间的分钟")]
     [Range(0, 59)]
     public int startMinute = 0;
 
@@ -40,9 +38,11 @@ public class WorldClock : MonoBehaviour
 
     public TimePeriod CurrentPeriod { get; private set; }
 
-    private float totalGameMinutes;
+    public int CurrentTotalMinutes { get; private set; }
 
     const int MinutesPerDay = 1440;
+
+    float totalGameMinutes;
 
     public static event Action OnMinuteChanged;
     public static event Action OnHourChanged;
@@ -56,9 +56,12 @@ public class WorldClock : MonoBehaviour
         CurrentDay = 1;
         CurrentDayOfWeek = DayOfWeek.Monday;
 
-        // 设置游戏总分钟数为第一天开始时间
         totalGameMinutes = startHour * 60 + startMinute;
-        AdvanceTime(0);
+    }
+    
+    void Start()
+    {
+        UpdateTimeState((int)totalGameMinutes, true);
     }
 
     void Update()
@@ -70,13 +73,11 @@ public class WorldClock : MonoBehaviour
     {
         switch (timeSpeed)
         {
-            case TimeSpeed.Slow:
-                return 1440f / 1800f;
-            case TimeSpeed.Normal:
-                return 1440f / 600f;
-            case TimeSpeed.Fast:
-                return 1440f / 120f;
+            case TimeSpeed.Slow: return 1440f / 1800f;
+            case TimeSpeed.Normal: return 1440f / 600f;
+            case TimeSpeed.Fast: return 1440f / 120f;
         }
+
         return 1f;
     }
 
@@ -84,34 +85,47 @@ public class WorldClock : MonoBehaviour
     {
         totalGameMinutes += delta * GetTimeScale();
 
-        int minutes = (int)totalGameMinutes;
+        int newTotalMinutes = (int)totalGameMinutes;
 
-        int newHour = (minutes / 60) % 24;
-        int newMinute = minutes % 60;
-        int dayCount = minutes / MinutesPerDay;
-
-        if (newMinute != CurrentMinute)
+        while (CurrentTotalMinutes < newTotalMinutes)
         {
-            CurrentMinute = newMinute;
-            OnMinuteChanged?.Invoke();
+            CurrentTotalMinutes++;
+            UpdateTimeState(CurrentTotalMinutes, false);
+        }
+    }
+
+    void UpdateTimeState(int minutes, bool forceUpdate)
+    {
+        int hour = (minutes / 60) % 24;
+        int minute = minutes % 60;
+        int dayIndex = minutes / MinutesPerDay;
+
+        bool minuteChanged = forceUpdate || minute != CurrentMinute;
+        bool hourChanged = forceUpdate || hour != CurrentHour;
+        bool dayChanged = forceUpdate || dayIndex + 1 != CurrentDay;
+
+        CurrentMinute = minute;
+        CurrentHour = hour;
+
+        if (dayChanged)
+        {
+            CurrentDay = dayIndex + 1;
+
+            CurrentDayOfWeek =
+                (DayOfWeek)(((int)DayOfWeek.Monday + dayIndex) % 7);
         }
 
-        if (newHour != CurrentHour)
+        if (minuteChanged)
+            OnMinuteChanged?.Invoke();
+
+        if (hourChanged)
         {
-            CurrentHour = newHour;
             OnHourChanged?.Invoke();
             UpdatePeriod();
         }
 
-        if (dayCount + 1 != CurrentDay)
-        {
-            CurrentDay = dayCount + 1;
-
-            CurrentDayOfWeek =
-                (DayOfWeek)(((int)DayOfWeek.Monday + dayCount) % 7);
-
+        if (dayChanged)
             OnDayChanged?.Invoke();
-        }
     }
 
     void UpdatePeriod()
@@ -127,12 +141,9 @@ public class WorldClock : MonoBehaviour
 
     TimePeriod GetPeriodByHour(int hour)
     {
-        if (hour < 6)
-            return TimePeriod.Night;
-        if (hour < 12)
-            return TimePeriod.Morning;
-        if (hour < 18)
-            return TimePeriod.Afternoon;
+        if (hour < 6) return TimePeriod.Night;
+        if (hour < 12) return TimePeriod.Morning;
+        if (hour < 18) return TimePeriod.Afternoon;
         return TimePeriod.Evening;
     }
 
@@ -141,58 +152,51 @@ public class WorldClock : MonoBehaviour
         timeSpeed = speed;
     }
 
-    /// <summary>
-    /// 跳到指定星期，并重置时间到每天开始时间
-    /// </summary>
+    public void JumpDays(int days)
+    {
+        int currentDayIndex = CurrentTotalMinutes / MinutesPerDay;
+
+        int newDayIndex = currentDayIndex + days;
+
+        totalGameMinutes = newDayIndex * MinutesPerDay + startHour * 60 + startMinute;
+
+        CurrentTotalMinutes = (int)totalGameMinutes;
+
+        UpdateTimeState(CurrentTotalMinutes, true);
+    }
+
+    public void SkipToNextDay()
+    {
+        JumpDays(1);
+    }
+
     public void JumpToDay(DayOfWeek targetDay)
     {
         int current = (int)CurrentDayOfWeek;
         int target = (int)targetDay;
 
         int diff = target - current;
-        if (diff < 0) diff += 7;
+
+        if (diff < 0)
+            diff += 7;
 
         JumpDays(diff);
     }
 
-    /// <summary>
-    /// 跳过若干天，每天从设置的开始时间开始
-    /// </summary>
-    public void JumpDays(int days)
-    {
-        // 计算新的总分钟数
-        int currentDayCount = (int)(totalGameMinutes / MinutesPerDay);
-        currentDayCount += days;
-        totalGameMinutes = currentDayCount * MinutesPerDay + startHour * 60 + startMinute;
-
-        AdvanceTime(0);
-    }
-
-    /// <summary>
-    /// 跳到下一天
-    /// </summary>
-    public void SkipToNextDay()
-    {
-        JumpDays(1);
-    }
-
-    /// <summary>
-    /// 设置每天开始时间
-    /// </summary>
     public void SetStartTime(int hour, int minute)
     {
         startHour = Mathf.Clamp(hour, 0, 23);
         startMinute = Mathf.Clamp(minute, 0, 59);
 
-        // 立即应用当前天的开始时间
-        int currentDayCount = (int)(totalGameMinutes / MinutesPerDay);
-        totalGameMinutes = currentDayCount * MinutesPerDay + startHour * 60 + startMinute;
-        AdvanceTime(0);
+        int currentDayIndex = CurrentTotalMinutes / MinutesPerDay;
+
+        totalGameMinutes = currentDayIndex * MinutesPerDay + startHour * 60 + startMinute;
+
+        CurrentTotalMinutes = (int)totalGameMinutes;
+
+        UpdateTimeState(CurrentTotalMinutes, true);
     }
 
-    /// <summary>
-    /// 获取当前时间字符串
-    /// </summary>
     public string GetTimeString()
     {
         return $"{CurrentHour:00}:{CurrentMinute:00}";

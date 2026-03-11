@@ -198,7 +198,7 @@ public class CameraManager : MonoBehaviour
     /// </summary>
     private IEnumerator SmoothCameraSwitch(CinemachineVirtualCamera fromCamera, CinemachineVirtualCamera toCamera, Vector3 targetPos, Quaternion targetRot)
     {
-        _playerController.enabled = false; // 切换过程中禁用玩家控制
+        _playerController.enabled = false;
 
         if (activeCamera == playerFollowCamera)
         {
@@ -210,28 +210,24 @@ public class CameraManager : MonoBehaviour
             activeCamera.Follow = null;
             activeCamera.LookAt = _npcCameraRoot;
         }
-
-        lastActiveCamera = activeCamera;
-        activeCamera = toCamera;
-
-        // 设置优先级
-        playerFollowCamera.Priority = (toCamera == playerFollowCamera) ? 20 : 10;
-        npcCamera.Priority = (toCamera == npcCamera) ? 20 : 10;
-        topDownCamera.Priority = (toCamera == topDownCamera) ? 20 : 10;
+        
+        // 统一切换摄像机状态
+        SetActiveCamera(toCamera);
 
         Vector3 startPos = fromCamera.transform.position;
         Quaternion startRot = fromCamera.transform.rotation;
 
         bool topDownFlag = (toCamera == topDownCamera);
-        if (topDownFlag) isTopDownTransitioning = true;
+        if (topDownFlag)
+            isTopDownTransitioning = true;
 
         float elapsed = 0f;
+
         while (elapsed < transitionDuration)
         {
             elapsed += Time.deltaTime;
             float t = Mathf.SmoothStep(0f, 1f, elapsed / transitionDuration);
 
-            // 平滑插值位置与旋转
             toCamera.transform.position = Vector3.Lerp(startPos, targetPos, t);
             toCamera.transform.rotation = Quaternion.Slerp(startRot, targetRot, t);
 
@@ -241,8 +237,9 @@ public class CameraManager : MonoBehaviour
         toCamera.transform.position = targetPos;
         toCamera.transform.rotation = targetRot;
 
-        if (topDownFlag) isTopDownTransitioning = false;
-        
+        if (topDownFlag)
+            isTopDownTransitioning = false;
+
         if (activeCamera == playerFollowCamera)
         {
             activeCamera.Follow = playerCameraRoot.transform;
@@ -253,8 +250,5 @@ public class CameraManager : MonoBehaviour
             activeCamera.Follow = _npcCameraRoot;
             activeCamera.LookAt = null;
         }
-
-        _playerController.enabled = (toCamera == playerFollowCamera);
-        Debug.Log(activeCamera);
     }
 }

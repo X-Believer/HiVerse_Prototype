@@ -55,10 +55,7 @@ public class UIManager : MonoBehaviour
     
     void Update()
     {
-        if (CameraManager.Instance.cameraMode == CameraMode.TopDown)
-        {
-            UpdateTopdownTipPosition();
-        }
+
     }
 
     //================================================
@@ -209,6 +206,7 @@ public class UIManager : MonoBehaviour
         {
             markers.Add(marker);
         }
+        marker.SetVisible(false);
     }
 
     public void UnregisterMarker(WorldMarker marker)
@@ -229,14 +227,6 @@ public class UIManager : MonoBehaviour
         }
     }
     
-    void UpdateTopdownTipPosition()
-    {
-        if (topdownTip != null && topdownTip.gameObject.activeSelf)
-        {
-            topdownTip.SetTooltipPosition(Input.mousePosition, 0, 0);
-        }
-    }
-    
     public WorldMarker CreateMarker(Transform target, string name, Sprite icon, Vector3 offset)
     {
         if (markerPrefab == null || worldCanvas == null)
@@ -248,9 +238,7 @@ public class UIManager : MonoBehaviour
         WorldMarker marker = Instantiate(markerPrefab, worldCanvas);
 
         marker.Init(target, name, icon, offset);
-
-        markers.Add(marker);
-
+        
         return marker;
     }
     
