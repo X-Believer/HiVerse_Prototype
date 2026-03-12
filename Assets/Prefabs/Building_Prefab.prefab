@@ -46,6 +46,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   buildingName: office_01
+  buildingIcon: {fileID: 21300000, guid: d8c8acad64402df4cba0f3417fc00276, type: 3}
   npcsInside: []
 --- !u!1 &4055590354341562623
 GameObject:

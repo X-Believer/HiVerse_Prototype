@@ -1,0 +1,10 @@
+{
+  "name": "Alice",
+  "age": 23,
+  "gender": 2,
+  "innate": "Optimistic",
+  "learned": "Painter",
+  "currently": "Looking for inspiration",
+  "lifestyle": "Night Owl",
+  "living_area": "Residence"
+}

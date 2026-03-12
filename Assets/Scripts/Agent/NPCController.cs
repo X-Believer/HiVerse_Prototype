@@ -7,11 +7,18 @@ using Opsive.BehaviorDesigner.Runtime;
 using Opsive.BehaviorDesigner;
 using Opsive.GraphDesigner.Runtime.Variables;
 
-public class NPCController : MonoBehaviour
+public class NPCController : MonoBehaviour, IMarkerTarget
 {
+    [Header("NPC Info")]
     public string npcName;
     public Sprite icon;
-    private string job;
+    private int age;
+    private Gender gender;
+    private string innate;
+    private string learned;
+    private string currently;
+    private string lifestyle;
+    private string livingArea;
     
     [Header("Schedule")]
     public NPCSchedule schedule;
@@ -59,8 +66,9 @@ public class NPCController : MonoBehaviour
     void Start()
     {
         NPCManager.Instance.RegisterNPC(this);
-        UIManager.Instance.CreateMarker(transform, npcName, icon, new Vector3(0, 3.0f, 0));
+        UIManager.Instance.CreateMarker(this);
         behaviorTree.SetVariableValue("Agent", gameObject);
+        behaviorTree.enabled = false;
         ReloadDailySchedule();
     }
 
@@ -70,6 +78,22 @@ public class NPCController : MonoBehaviour
         float speed = agent.velocity.magnitude;
         animator.SetFloat("Speed", speed);
         animator.SetFloat("MotionSpeed",1);
+    }
+    
+    // ======================
+    // 数字人格
+    // ======================
+    public void InitFromPersonality(NPCPersonalityData data)
+    {
+        npcName = data.name;
+        age = data.age;
+        gender = (Gender)data.gender;
+
+        innate = data.innate;
+        learned = data.learned;
+        currently = data.currently;
+        lifestyle = data.lifestyle;
+        livingArea = data.living_area;
     }
 
     // ======================
@@ -262,11 +286,98 @@ public class NPCController : MonoBehaviour
         
     }
     
+    string GetGenderText()
+    {
+        switch (gender)
+        {
+            case Gender.Male: return "Male";
+            case Gender.Female: return "Female";
+        }
+
+        return "Unknown";
+    }
+    
+    public string GetNPCInfoText()
+    {
+        System.Text.StringBuilder sb = new System.Text.StringBuilder();
+
+        sb.AppendLine($"Name: {npcName}");
+        sb.AppendLine($"Age: {age}");
+        sb.AppendLine($"Gender: {GetGenderText()}");
+        sb.AppendLine();
+        sb.AppendLine($"Innate: {innate}");
+        sb.AppendLine($"Learned: {learned}");
+        sb.AppendLine($"Currently: {currently}");
+        sb.AppendLine($"Lifestyle: {lifestyle}");
+        sb.AppendLine($"Living Area: {livingArea}");
+
+        return sb.ToString();
+    }
+    
+    public string GetTodayScheduleText()
+    {
+        if (schedule == null || schedule.dailyPlan.Count == 0)
+            return "No schedule for today.";
+
+        System.Text.StringBuilder sb = new System.Text.StringBuilder();
+
+        foreach (var item in schedule.dailyPlan)
+        {
+            // 开始时间
+            int startHour = item.hour;
+            int startMinute = item.minute;
+
+            // 结束时间
+            int totalMinutes = startHour * 60 + startMinute + Mathf.RoundToInt(item.duration);
+            int endHour = (totalMinutes / 60) % 24; // 保证24小时循环
+            int endMinute = totalMinutes % 60;
+
+            string startStr = $"{startHour:D2}:{startMinute:D2}";
+            string endStr = $"{endHour:D2}:{endMinute:D2}";
+
+            string target = string.IsNullOrEmpty(item.target) ? "Unknown" : item.target;
+            string action = string.IsNullOrEmpty(item.action) ? "Idle" : item.action;
+
+            sb.AppendLine($"{startStr} - {endStr} | {target} | {action}");
+            sb.AppendLine();
+        }
+
+        return sb.ToString();
+    }
+    
     // ======================
     // 监听摄像机模式
     // ======================
     void OnCameraModeChanged(CameraMode mode)
     {
         
+    }
+    
+    // ======================
+    // Marker Interface
+    // ======================
+    public Transform GetMarkerTransform()
+    {
+        return transform;
+    }
+
+    public string GetMarkerName()
+    {
+        return npcName;
+    }
+
+    public Sprite GetMarkerIcon()
+    {
+        return icon;
+    }
+
+    public Vector3 GetMarkerOffset()
+    {
+        return Vector3.up * 2f;
+    }
+    
+    public MarkerType GetMarkerType()
+    {
+        return MarkerType.NPC;
     }
 }

@@ -1,13 +1,34 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.EventSystems;
 
 public enum NPCSpeed
 {
     Slow = 1,
     Normal = 2,
     Fast = 3
+}
+
+public enum Gender
+{
+    Male = 1,
+    Female = 2
+}
+
+[Serializable]
+public class NPCPersonalityData
+{
+    public string name;
+    public int age;
+    public int gender;
+    public string innate;
+    public string learned;
+    public string currently;
+    public string lifestyle;
+    public string living_area;
 }
 
 public class NPCManager : MonoBehaviour
@@ -20,7 +41,18 @@ public class NPCManager : MonoBehaviour
     public Vector3 NPCStartPosition;
     public NPCSpeed NPCSpeed = NPCSpeed.Normal;
 
+    [Header("NPC Container")]
+    public Transform agentsRoot;
+
+    [Header("Raycast")]
+    public LayerMask npcLayer;
+
     private List<NPCController> npcs = new List<NPCController>();
+
+    // 鼠标悬停
+    private NPCController hoverNPC;
+
+    // 当前选中
     private NPCController currentNPC;
 
     // ======================
@@ -38,7 +70,12 @@ public class NPCManager : MonoBehaviour
         else
             Destroy(gameObject);
     }
-    
+
+    void Start()
+    {
+        LoadNPCsFromPersonalities();
+    }
+
     void OnEnable()
     {
         WorldClock.OnDayChanged += ResetNPCPosition;
@@ -59,63 +96,99 @@ public class NPCManager : MonoBehaviour
     // ======================
     void DetectMouseNPC()
     {
+        // 鼠标在UI上时不检测
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            return;
+
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
         RaycastHit hit;
 
-        if (Physics.Raycast(ray, out hit, 100))
+        NPCController npc = null;
+
+        if (Physics.Raycast(ray, out hit, 100f, npcLayer))
         {
-            NPCController npc = hit.collider.GetComponentInParent<NPCController>();
-
-            if (npc != null)
-            {
-                if (currentNPC != npc)
-                {
-                    ClearHighlight();
-
-                    currentNPC = npc;
-                    currentNPC.Highlight(true);
-
-                    OnCurrentNPCChanged?.Invoke(currentNPC);
-                }
-
-                if (Input.GetMouseButtonDown(0))
-                {
-                    currentNPC.OnClick();
-                }
-
-                return;
-            }
+            npc = hit.collider.GetComponentInParent<NPCController>();
         }
 
-        ClearHighlight();
-    }
-
-    void ClearHighlight()
-    {
-        if (currentNPC != null)
+        // Hover变化
+        if (hoverNPC != npc)
         {
-            currentNPC.Highlight(false);
-            currentNPC = null;
+            if (hoverNPC != null)
+                hoverNPC.Highlight(false);
 
-            OnCurrentNPCChanged?.Invoke(null);
+            hoverNPC = npc;
+
+            if (hoverNPC != null)
+                hoverNPC.Highlight(true);
+        }
+
+        // 点击
+        if (hoverNPC != null && Input.GetMouseButtonDown(0))
+        {
+            SetCurrentNPC(hoverNPC);
+            hoverNPC.OnClick();
         }
     }
 
     // ======================
     // NPC生成
     // ======================
-    public NPCController SpawnNPC(Vector3 position)
+    void LoadNPCsFromPersonalities()
     {
-        GameObject obj = Instantiate(npcPrefab, position, Quaternion.identity);
+        string folder = Path.Combine(
+            Application.streamingAssetsPath,
+            "Personalities"
+        );
+
+        if (!Directory.Exists(folder))
+        {
+            Debug.LogWarning("Personalities folder not found");
+            return;
+        }
+
+        string[] files = Directory.GetFiles(folder, "*.json");
+
+        int index = 0;
+
+        foreach (string file in files)
+        {
+            string json = File.ReadAllText(file);
+
+            NPCPersonalityData data =
+                JsonUtility.FromJson<NPCPersonalityData>(json);
+
+            Vector3 pos = NPCStartPosition + new Vector3(
+                (index % 5) * 2,
+                0,
+                (index / 5) * 2
+            );
+
+            SpawnNPCWithData(pos, data);
+
+            index++;
+        }
+    }
+
+    NPCController SpawnNPCWithData(Vector3 position, NPCPersonalityData data)
+    {
+        GameObject obj = Instantiate(
+            npcPrefab,
+            position,
+            Quaternion.identity,
+            agentsRoot
+        );
+
         NPCController npc = obj.GetComponent<NPCController>();
 
         if (npc != null)
         {
+            npc.InitFromPersonality(data);
+
+            NavMeshAgent agent = obj.GetComponent<NavMeshAgent>();
+            if (agent != null)
+                agent.speed = GetNPCSpeed();
+
             RegisterNPC(npc);
-        }
-        else
-        {
-            Debug.LogWarning("Spawned NPC has no NPCController!");
         }
 
         return npc;
@@ -169,7 +242,7 @@ public class NPCManager : MonoBehaviour
     {
         return npcs;
     }
-    
+
     // ======================
     // 重置 NPC 位置
     // ======================
@@ -181,19 +254,22 @@ public class NPCManager : MonoBehaviour
             int col = i % 5;
 
             Vector3 pos = NPCStartPosition + new Vector3(col * 2, 0, row * 2);
-            npcs[i].transform.position = pos;
 
-            // 重置NavMeshAgent状态
             NavMeshAgent agent = npcs[i].GetComponent<NavMeshAgent>();
+
             if (agent != null)
             {
-                agent.Warp(pos); // 瞬间移动到目标，不会被NavMesh阻挡
-                agent.ResetPath(); // 清除原来的路径
+                agent.Warp(pos);
+                agent.ResetPath();
                 agent.isStopped = true;
+            }
+            else
+            {
+                npcs[i].transform.position = pos;
             }
         }
     }
-    
+
     float GetNPCSpeed()
     {
         switch (NPCSpeed)
@@ -205,20 +281,34 @@ public class NPCManager : MonoBehaviour
 
         return 3f;
     }
-    
+
     public void SetNPCSpeed(NPCSpeed speed)
     {
         NPCSpeed = speed;
+
         foreach (var npc in npcs)
         {
             if (npc != null)
             {
                 NavMeshAgent agent = npc.GetComponent<NavMeshAgent>();
+
                 if (agent != null)
-                {
                     agent.speed = GetNPCSpeed();
-                }
             }
         }
+    }
+
+    public NPCController GetCurrentNPC()
+    {
+        return currentNPC;
+    }
+
+    public void SetCurrentNPC(NPCController npc)
+    {
+        if (currentNPC == npc) return;
+
+        currentNPC = npc;
+
+        OnCurrentNPCChanged?.Invoke(currentNPC);
     }
 }

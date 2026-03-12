@@ -19,6 +19,9 @@ public class UIManager : MonoBehaviour
     public WorldMarker markerPrefab;
     public Tooltip topdownTip;
     
+    [Header("Marker Overlap")]
+    public float markerMinDistance = 70f;
+    public int avoidanceIterations = 3;
     private List<WorldMarker> markers = new List<WorldMarker>();
 
     [Header("Player")]
@@ -55,7 +58,7 @@ public class UIManager : MonoBehaviour
     
     void Update()
     {
-
+        UpdateMarkerPositions();
     }
 
     //================================================
@@ -227,18 +230,15 @@ public class UIManager : MonoBehaviour
         }
     }
     
-    public WorldMarker CreateMarker(Transform target, string name, Sprite icon, Vector3 offset)
+    public WorldMarker CreateMarker(IMarkerTarget target)
     {
         if (markerPrefab == null || worldCanvas == null)
-        {
-            Debug.LogWarning("WorldUI not configured.");
             return null;
-        }
 
         WorldMarker marker = Instantiate(markerPrefab, worldCanvas);
 
-        marker.Init(target, name, icon, offset);
-        
+        marker.Init(target);
+
         return marker;
     }
     
@@ -251,6 +251,76 @@ public class UIManager : MonoBehaviour
             markers.Remove(marker);
 
         Destroy(marker.gameObject);
+    }
+    
+    void UpdateMarkerPositions()
+    {
+        if (markers.Count == 0)
+            return;
+
+        // 1 初始化最终位置
+        foreach (var marker in markers)
+        {
+            marker.finalPosition = marker.projectedPosition;
+        }
+
+        // 2 解决重叠
+        ResolveMarkerOverlap();
+
+        // 3 应用最终位置
+        foreach (var marker in markers)
+        {
+            marker.ApplyFinalPosition();
+        }
+    }
+    
+    void ResolveMarkerOverlap()
+    {
+        int count = markers.Count;
+
+        for (int iter = 0; iter < avoidanceIterations; iter++)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                var a = markers[i];
+
+                for (int j = i + 1; j < count; j++)
+                {
+                    var b = markers[j];
+
+                    Vector2 delta = a.finalPosition - b.finalPosition;
+                    float dist = delta.magnitude;
+
+                    if (dist < markerMinDistance)
+                    {
+                        if (dist < 0.01f)
+                        {
+                            delta = Random.insideUnitCircle;
+                            dist = 0.01f;
+                        }
+
+                        Vector2 push = delta.normalized * (markerMinDistance - dist) * 0.5f;
+
+                        bool aFixed = a.markerType == MarkerType.Building;
+                        bool bFixed = b.markerType == MarkerType.Building;
+
+                        if (aFixed && !bFixed)
+                        {
+                            b.finalPosition -= push * 2f;
+                        }
+                        else if (!aFixed && bFixed)
+                        {
+                            a.finalPosition += push * 2f;
+                        }
+                        else
+                        {
+                            a.finalPosition += push;
+                            b.finalPosition -= push;
+                        }
+                    }
+                }
+            }
+        }
     }
     
     public void ShowTooltip(string text, Vector2 screenPos)
