@@ -12,6 +12,7 @@ public enum NPCSpeed
     Fast = 3
 }
 
+[Serializable]
 public enum Gender
 {
     Male = 1,
@@ -135,10 +136,7 @@ public class NPCManager : MonoBehaviour
     // ======================
     void LoadNPCsFromPersonalities()
     {
-        string folder = Path.Combine(
-            Application.streamingAssetsPath,
-            "Personalities"
-        );
+        string folder = DataPath.Personalities;
 
         if (!Directory.Exists(folder))
         {

@@ -187,8 +187,7 @@ public class NPCController : MonoBehaviour, IMarkerTarget
     void LoadScheduleFromJson()
     {
         string path = Path.Combine(
-            Application.streamingAssetsPath,
-            "NPCSchedules",
+            DataPath.NPCSchedules,
             npcName + ".json"
         );
 

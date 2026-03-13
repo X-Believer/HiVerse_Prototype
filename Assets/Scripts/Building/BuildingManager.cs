@@ -42,8 +42,7 @@ public class BuildingManager : MonoBehaviour
         string fileName = GetTodayEventFileName();
 
         string path = Path.Combine(
-            Application.streamingAssetsPath,
-            "CityEvents",
+            DataPath.CityEvents,
             fileName
         );
 
@@ -140,10 +139,6 @@ public class BuildingManager : MonoBehaviour
                 .ToString()
                 .ToLower() + ".json";
 
-        return Path.Combine(
-            Application.streamingAssetsPath,
-            "CityEvents",
-            fileName
-        );
+        return Path.Combine(DataPath.CityEvents, fileName);
     }
 }
