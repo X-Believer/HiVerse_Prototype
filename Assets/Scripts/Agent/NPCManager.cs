@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.EventSystems;
@@ -30,6 +32,16 @@ public class NPCPersonalityData
     public string currently;
     public string lifestyle;
     public string living_area;
+}
+
+public class PersonalityFile
+{
+    public string created_at;
+    public NPCPersonalityData personality_data;
+    public int personality_id;
+    public string personality_name;
+    public int? schedule_id;
+    public int user_id;
 }
 
 public class NPCManager : MonoBehaviour
@@ -152,8 +164,10 @@ public class NPCManager : MonoBehaviour
         {
             string json = File.ReadAllText(file);
 
-            NPCPersonalityData data =
-                JsonUtility.FromJson<NPCPersonalityData>(json);
+            PersonalityFile fileData =
+                JsonConvert.DeserializeObject<PersonalityFile>(json);
+
+            NPCPersonalityData data = fileData.personality_data;
 
             Vector3 pos = NPCStartPosition + new Vector3(
                 (index % 5) * 2,

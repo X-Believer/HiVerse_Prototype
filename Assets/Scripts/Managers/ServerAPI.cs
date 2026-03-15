@@ -1,15 +1,23 @@
-using System.Collections;
-using UnityEngine;
-using UnityEngine.Networking;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using UnityEngine;
+using UnityEngine.Networking;
+using Newtonsoft.Json;
 
 public class ServerAPI : MonoBehaviour
 {
     public static ServerAPI Instance;
     public string serverURL = "http://127.0.0.1:5000/";
+
+    // ------------------- 加载事件 -------------------
+    public event Action OnRequestStarted;
+    public event Action OnRequestEnded;
+
+    private void RaiseRequestStarted() => OnRequestStarted?.Invoke();
+    private void RaiseRequestEnded() => OnRequestEnded?.Invoke();
 
     private void Awake()
     {
@@ -22,17 +30,17 @@ public class ServerAPI : MonoBehaviour
         DontDestroyOnLoad(gameObject);
     }
 
-    /// <summary>
-    /// 发送POST JSON请求
-    /// </summary>
+    // ------------------- 通用 POST JSON -------------------
     public void PostJson(string url, object data, Action<bool, string> callback)
     {
-        string json = JsonUtility.ToJson(data);
+        string json = JsonConvert.SerializeObject(data);
         StartCoroutine(PostJsonCoroutine(url, json, callback));
     }
 
     private IEnumerator PostJsonCoroutine(string url, string json, Action<bool, string> callback)
     {
+        RaiseRequestStarted(); // 请求开始
+
         byte[] postData = Encoding.UTF8.GetBytes(json);
         UnityWebRequest www = new UnityWebRequest(url, "POST");
         www.uploadHandler = new UploadHandlerRaw(postData);
@@ -51,258 +59,36 @@ public class ServerAPI : MonoBehaviour
             Debug.Log("HTTP请求成功: " + www.downloadHandler.text);
             callback?.Invoke(true, www.downloadHandler.text);
         }
+
+        RaiseRequestEnded(); // 请求结束
     }
 
-    /// <summary>
-    /// 下载数字人格 JSON 文件到 persistentDataPath/Personalities
-    /// </summary>
-    private IEnumerator DownloadPersonality(string url, Action<bool, string> callback)
+    // ------------------- 下载文件工具 -------------------
+    private IEnumerator DownloadFile(string url, string folder, string filename, Action<bool, string> callback)
     {
+        RaiseRequestStarted(); // 下载开始
+
         UnityWebRequest www = UnityWebRequest.Get(url);
         yield return www.SendWebRequest();
 
         if (www.result != UnityWebRequest.Result.Success)
         {
             Debug.LogError("下载失败: " + www.error);
-            callback?.Invoke(false, www.error);
-            yield break;
-        }
-
-        string folder = DataPath.Personalities;
-        Directory.CreateDirectory(folder);
-
-        string filename = Path.GetFileName(url);
-        string path = Path.Combine(folder, filename);
-
-        File.WriteAllText(path, www.downloadHandler.text);
-        Debug.Log("Personality saved: " + path);
-
-        callback?.Invoke(true, path);
-    }
-
-    /// <summary>
-    /// 生成数字人格并下载 JSON
-    /// </summary>
-    public void GenerateAndDownloadNPC(NPCRequestData requestData, Action<bool, string> callback)
-    {
-        string url = serverURL + "api/generatePersonality";
-
-        // 先POST生成
-        PostJson(url, requestData, (success, response) =>
-        {
-            if (!success)
-            {
-                callback?.Invoke(false, "生成失败: " + response);
-                return;
-            }
-
-            // 解析返回 JSON 获取 download_url
-            GenerateResponse res = JsonUtility.FromJson<GenerateResponse>(response);
-            if (!res.success || string.IsNullOrEmpty(res.download_url))
-            {
-                callback?.Invoke(false, "生成返回异常");
-                return;
-            }
-
-            string fullUrl = serverURL.TrimEnd('/') + res.download_url;
-
-            // 下载数字人格
-            StartCoroutine(DownloadPersonality(fullUrl, callback));
-        });
-    }
-    
-    /// 下载单个 NPC 周计划 JSON
-    /// </summary>
-    private IEnumerator DownloadWeeklySchedule(string url, string npcName, Action<bool, string> callback)
-    {
-        UnityWebRequest www = UnityWebRequest.Get(url);
-        yield return www.SendWebRequest();
-
-        if (www.result != UnityWebRequest.Result.Success)
-        {
-            Debug.LogError($"下载{npcName}周计划失败: " + www.error);
             callback?.Invoke(false, null);
-            yield break;
+        }
+        else
+        {
+            Directory.CreateDirectory(folder);
+            string path = Path.Combine(folder, filename);
+            File.WriteAllText(path, www.downloadHandler.text);
+            callback?.Invoke(true, path);
         }
 
-        string folder = Path.Combine(Application.persistentDataPath, "WeeklySchedules");
-        Directory.CreateDirectory(folder);
-
-        string filename = Path.GetFileName(url);
-        string path = Path.Combine(folder, filename);
-
-        File.WriteAllText(path, www.downloadHandler.text);
-        Debug.Log($"周计划已保存: {path}");
-
-        callback?.Invoke(true, path);
+        RaiseRequestEnded(); // 下载结束
     }
 
-    /// <summary>
-    /// 一步生成并下载所有 NPC 的 7 天周计划
-    /// </summary>
-    public void GenerateAndDownloadWeeklySchedules(List<string> npcNames, string startDate, Action<bool, Dictionary<string, string>> callback)
-    {
-        StartCoroutine(GenerateAndDownloadCoroutine(npcNames, startDate, callback));
-    }
-
-    private IEnumerator GenerateAndDownloadCoroutine(List<string> npcNames, string startDate, Action<bool, Dictionary<string, string>> callback)
-    {
-        var weekSchedulesPaths = new Dictionary<string, string>();
-
-        var requestData = new
-        {
-            npcNames = npcNames,
-            startDate = startDate
-        };
-
-        bool requestCompleted = false;
-        string responseText = null;
-        bool requestSuccess = false;
-
-        PostJson(serverURL + "api/generateWeeklySchedule", requestData, (success, response) =>
-        {
-            requestCompleted = true;
-            requestSuccess = success;
-            responseText = response;
-        });
-
-        // 等待请求完成
-        while (!requestCompleted)
-            yield return null;
-
-        if (!requestSuccess)
-        {
-            callback?.Invoke(false, null);
-            yield break;
-        }
-
-        // 解析 JSON 返回
-        var res = JsonUtility.FromJson<WeeklyResponse>(responseText);
-        if (!res.success)
-        {
-            callback?.Invoke(false, null);
-            yield break;
-        }
-
-        foreach (var kvp in res.weekSchedules)
-        {
-            string npcName = kvp.Key;
-            string downloadUrl = serverURL.TrimEnd('/') + kvp.Value;
-
-            bool downloadDone = false;
-            string savedPath = null;
-            StartCoroutine(DownloadWeeklySchedule(downloadUrl, npcName, (suc, path) =>
-            {
-                savedPath = path;
-                downloadDone = true;
-            }));
-
-            while (!downloadDone)
-                yield return null;
-
-            weekSchedulesPaths[npcName] = savedPath;
-        }
-
-        callback?.Invoke(true, weekSchedulesPaths);
-    }
-
-    /// <summary>
-    /// 请求并下载7天城市事件JSON
-    /// </summary>
-    public void DownloadCityEvents(string startDate, Action<bool, Dictionary<string, string>> callback)
-    {
-        StartCoroutine(DownloadCityEventsCoroutine(startDate, callback));
-    }
-    
-    private IEnumerator DownloadCityEventsCoroutine(string startDate, Action<bool, Dictionary<string, string>> callback)
-    {
-        var requestData = new
-        {
-            startDate = string.IsNullOrEmpty(startDate) ? "2026-01-01" : startDate
-        };
-
-        bool requestCompleted = false;
-        bool requestSuccess = false;
-        string responseText = null;
-
-        PostJson(serverURL + "api/getCityEvents", requestData, (success, response) =>
-        {
-            requestCompleted = true;
-            requestSuccess = success;
-            responseText = response;
-        });
-
-        while (!requestCompleted)
-            yield return null;
-
-        if (!requestSuccess)
-        {
-            callback?.Invoke(false, null);
-            yield break;
-        }
-
-        var res = JsonUtility.FromJson<CityEventsResponse>(responseText);
-        if (!res.success)
-        {
-            callback?.Invoke(false, null);
-            yield break;
-        }
-
-        string folder = DataPath.CityEvents;
-        Directory.CreateDirectory(folder);
-
-        var savedPaths = new Dictionary<string, string>();
-
-        foreach (var kvp in res.cityEvents)
-        {
-            string day = kvp.Key;              // monday
-            string downloadUrl = serverURL.TrimEnd('/') + kvp.Value;
-
-            bool done = false;
-            string savedPath = null;
-
-            StartCoroutine(DownloadCityEventFile(downloadUrl, day, (suc, path) =>
-            {
-                savedPath = path;
-                done = true;
-            }));
-
-            while (!done)
-                yield return null;
-
-            savedPaths[day] = savedPath;
-        }
-
-        callback?.Invoke(true, savedPaths);
-    }
-    
-    private IEnumerator DownloadCityEventFile(string url, string dayName, Action<bool, string> callback)
-    {
-        UnityWebRequest www = UnityWebRequest.Get(url);
-        yield return www.SendWebRequest();
-
-        if (www.result != UnityWebRequest.Result.Success)
-        {
-            Debug.LogError("下载CityEvent失败: " + www.error);
-            callback?.Invoke(false, null);
-            yield break;
-        }
-
-        string folder = DataPath.CityEvents;
-        Directory.CreateDirectory(folder);
-
-        string filename = dayName.ToLower() + ".json";
-        string path = Path.Combine(folder, filename);
-
-        File.WriteAllText(path, www.downloadHandler.text);
-
-        Debug.Log("CityEvent saved: " + path);
-
-        callback?.Invoke(true, path);
-    }
-
-    // ------------------- 数据类 -------------------
-    [System.Serializable]
+    // ------------------- 数字人格 -------------------
+    [Serializable]
     public class NPCRequestData
     {
         public string name;
@@ -314,24 +100,374 @@ public class ServerAPI : MonoBehaviour
         public string creatorUsername;
     }
 
-    [System.Serializable]
-    private class GenerateResponse
+    public class GenerateResponse
     {
-        public bool success;
-        public string download_url;
+        [JsonProperty("success")]
+        public bool Success { get; set; }
+        [JsonProperty("download_url")]
+        public string DownloadUrl { get; set; }
+    }
+
+    public class PersonalitiesResponse
+    {
+        [JsonProperty("success")]
+        public bool Success { get; set; }
+
+        [JsonProperty("personalities")]
+        public List<Dictionary<string, object>> Personalities { get; set; }
+    }
+
+    public void GenerateAndDownloadNPC(NPCRequestData requestData, Action<bool, string> callback)
+    {
+        StartCoroutine(GenerateAndDownloadNPCCoroutine(requestData, callback));
+    }
+
+    private IEnumerator GenerateAndDownloadNPCCoroutine(NPCRequestData requestData, Action<bool, string> callback)
+    {
+        RaiseRequestStarted();
+
+        // 1. POST 请求生成
+        bool requestDone = false;
+        bool requestSuccess = false;
+        string responseText = null;
+
+        PostJson(serverURL + "api/generatePersonality", requestData, (s, r) =>
+        {
+            requestDone = true;
+            requestSuccess = s;
+            responseText = r;
+        });
+
+        while (!requestDone)
+            yield return null;
+
+        if (!requestSuccess)
+        {
+            RaiseRequestEnded();
+            callback?.Invoke(false, "生成失败: " + responseText);
+            yield break;
+        }
+
+        var res = JsonConvert.DeserializeObject<GenerateResponse>(responseText);
+        if (!res.Success || string.IsNullOrEmpty(res.DownloadUrl))
+        {
+            RaiseRequestEnded();
+            callback?.Invoke(false, "生成返回异常");
+            yield break;
+        }
+
+        // 2. 下载 JSON 文件
+        string fullUrl = serverURL.TrimEnd('/') + res.DownloadUrl;
+        string folder = DataPath.Personalities;
+        string filename = Path.GetFileName(fullUrl);
+
+        bool downloadDone = false;
+        string path = null;
+
+        StartCoroutine(DownloadFile(fullUrl, folder, filename, (suc, p) =>
+        {
+            path = p;
+            downloadDone = true;
+        }));
+
+        while (!downloadDone)
+            yield return null;
+
+        RaiseRequestEnded();
+        callback(true, path);
+    }
+
+    public void GetLatestPersonalities(int count, Action<bool, Dictionary<int, string>, List<int>> callback)
+    {
+        StartCoroutine(GetLatestPersonalitiesCoroutine(count, callback));
+    }
+
+    private IEnumerator GetLatestPersonalitiesCoroutine(
+        int count,
+        Action<bool, Dictionary<int, string>, List<int>> callback)
+    {
+        RaiseRequestStarted();
+
+        string url = serverURL + "api/getLatestPersonalities";
+
+        var requestData = new
+        {
+            count = count
+        };
+
+        string json = JsonConvert.SerializeObject(requestData);
+
+        UnityWebRequest www = new UnityWebRequest(url, "POST");
+        www.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json));
+        www.downloadHandler = new DownloadHandlerBuffer();
+        www.SetRequestHeader("Content-Type", "application/json");
+
+        yield return www.SendWebRequest();
+
+        if (www.result != UnityWebRequest.Result.Success)
+        {
+            Debug.LogError("下载Personalities失败: " + www.error);
+            RaiseRequestEnded();
+            callback(false, null, null);
+            yield break;
+        }
+
+        var res = JsonConvert.DeserializeObject<PersonalitiesResponse>(www.downloadHandler.text);
+
+        if (!res.Success)
+        {
+            Debug.LogError("服务器返回失败");
+            RaiseRequestEnded();
+            callback(false, null, null);
+            yield break;
+        }
+
+        string folder = DataPath.Personalities;
+        Directory.CreateDirectory(folder);
+
+        var savedPaths = new Dictionary<int, string>();
+        var personalityIds = new List<int>();
+
+        foreach (var personality in res.Personalities)
+        {
+            int id = System.Convert.ToInt32(personality["personality_id"]);
+            string name = personality["personality_name"].ToString();
+
+            string filename = name + ".json";
+            string path = Path.Combine(folder, filename);
+
+            string jsonText = JsonConvert.SerializeObject(personality, Formatting.Indented);
+
+            File.WriteAllText(path, jsonText);
+
+            savedPaths[id] = path;
+            personalityIds.Add(id);
+        }
+
+        Debug.Log("Personalities 下载完成");
+
+        RaiseRequestEnded();
+        callback(true, savedPaths, personalityIds);
+    }
+
+    // ------------------- NPC 周计划 -------------------
+    public class WeeklyResponse
+    {
+        [JsonProperty("success")]
+        public bool Success { get; set; }
+        [JsonProperty("weekSchedules")]
+        public Dictionary<string, object> WeekSchedules { get; set; }
+    }
+
+    private IEnumerator DownloadWeeklySchedule(string url, string npcName, Action<bool, string> callback)
+    {
+        string folder = Path.Combine(Application.persistentDataPath, "WeeklySchedules");
+        string filename = npcName + ".json";
+        yield return DownloadFile(url, folder, filename, callback);
+    }
+
+    public void GenerateAndDownloadWeeklySchedules(List<string> npcNames, string startDate, Action<bool, Dictionary<string, string>> callback)
+    {
+        StartCoroutine(GenerateAndDownloadWeeklySchedulesCoroutine(npcNames, startDate, callback));
+    }
+
+    private IEnumerator GenerateAndDownloadWeeklySchedulesCoroutine(List<string> npcNames, string startDate, Action<bool, Dictionary<string, string>> callback)
+    {
+        RaiseRequestStarted(); // 批量操作开始
+
+        var weekSchedulesPaths = new Dictionary<string, string>();
+        var requestData = new { npcNames = npcNames, startDate = startDate };
+
+        bool requestCompleted = false;
+        bool requestSuccess = false;
+        string responseText = null;
+
+        PostJson(serverURL + "api/generateWeeklySchedule", requestData, (s, r) =>
+        {
+            requestCompleted = true;
+            requestSuccess = s;
+            responseText = r;
+        });
+
+        while (!requestCompleted)
+            yield return null;
+
+        if (!requestSuccess)
+        {
+            RaiseRequestEnded();
+            callback?.Invoke(false, null);
+            yield break;
+        }
+
+        var res = JsonConvert.DeserializeObject<WeeklyResponse>(responseText);
+        if (!res.Success)
+        {
+            RaiseRequestEnded();
+            callback?.Invoke(false, null);
+            yield break;
+        }
+
+        foreach (var kvp in res.WeekSchedules)
+        {
+            string npcName = kvp.Key;
+            string url = serverURL.TrimEnd('/') + kvp.Value.ToString();
+            bool done = false;
+            string path = null;
+
+            StartCoroutine(DownloadWeeklySchedule(url, npcName, (suc, p) =>
+            {
+                path = p;
+                done = true;
+            }));
+
+            while (!done)
+                yield return null;
+
+            weekSchedulesPaths[npcName] = path;
+        }
+
+        RaiseRequestEnded(); // 批量操作结束
+        callback(true, weekSchedulesPaths);
+    }
+
+    public void GetAllNPCSchedules(List<int> personalityIds, Action<bool, Dictionary<string, string>> callback)
+    {
+        StartCoroutine(GetAllNPCSchedulesCoroutine(personalityIds, callback));
+    }
+
+    private IEnumerator GetAllNPCSchedulesCoroutine(List<int> ids, Action<bool, Dictionary<string, string>> callback)
+    {
+        RaiseRequestStarted(); // 批量操作开始
+
+        string url = serverURL + "api/getNPCSchedules";
+        var requestData = new { personalityIds = ids };
+        string json = JsonConvert.SerializeObject(requestData);
+
+        UnityWebRequest www = new UnityWebRequest(url, "POST");
+        www.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json));
+        www.downloadHandler = new DownloadHandlerBuffer();
+        www.SetRequestHeader("Content-Type", "application/json");
+
+        yield return www.SendWebRequest();
+
+        if (www.result != UnityWebRequest.Result.Success)
+        {
+            Debug.LogError("下载NPC周计划失败: " + www.error);
+            RaiseRequestEnded();
+            callback(false, null);
+            yield break;
+        }
+
+        var res = JsonConvert.DeserializeObject<WeeklyResponse>(www.downloadHandler.text);
+        string folder = DataPath.NPCSchedules;
+        Directory.CreateDirectory(folder);
+        var savedPaths = new Dictionary<string, string>();
+
+        foreach (var kvp in res.WeekSchedules)
+        {
+            string filename = kvp.Key + ".json";
+            string path = Path.Combine(folder, filename);
+            string jsonText = JsonConvert.SerializeObject(kvp.Value, Formatting.Indented);
+            File.WriteAllText(path, jsonText);
+            savedPaths[kvp.Key] = path;
+        }
+
+        RaiseRequestEnded();
+        callback(true, savedPaths);
+    }
+
+    // ------------------- 城市事件 -------------------
+    public class CityEventsResponse
+    {
+        [JsonProperty("success")]
+        public bool Success { get; set; }
+
+        [JsonProperty("cityEvents")]
+        public Dictionary<string, object> CityEvents { get; set; }
+    }
+    [Serializable]
+    public class CityEventConfig
+    {
+        public string eventName;
+        public string eventDescription;
+        public string buildingName;
+        public int startTime;
+        public int endTime;
+        public int capacity;
+    }
+
+    [Serializable]
+    public class CityEventConfigList
+    {
+        public List<CityEventConfig> events;
     }
     
-    [Serializable]
-    private class WeeklyResponse
+
+    public void GetCityEvents(string startDate, System.Action<bool, Dictionary<string, string>> callback)
     {
-        public bool success;
-        public Dictionary<string, string> weekSchedules;
+        StartCoroutine(GetCityEventsCoroutine(startDate, callback));
     }
-    [Serializable]
-    private class CityEventsResponse
+
+    private IEnumerator GetCityEventsCoroutine(string startDate, System.Action<bool, Dictionary<string, string>> callback)
     {
-        public bool success;
-        public Dictionary<string, string> cityEvents;
+        RaiseRequestStarted();
+
+        string url = serverURL + "api/getCityEvents";
+
+        var requestData = new
+        {
+            startDate = startDate
+        };
+
+        string json = JsonConvert.SerializeObject(requestData);
+
+        UnityWebRequest www = new UnityWebRequest(url, "POST");
+        www.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
+        www.downloadHandler = new DownloadHandlerBuffer();
+        www.SetRequestHeader("Content-Type", "application/json");
+
+        yield return www.SendWebRequest();
+
+        if (www.result != UnityWebRequest.Result.Success)
+        {
+            Debug.LogError("下载CityEvents失败: " + www.error);
+            RaiseRequestEnded();
+            callback(false, null);
+            yield break;
+        }
+
+        var res = JsonConvert.DeserializeObject<CityEventsResponse>(www.downloadHandler.text);
+
+        if (!res.Success)
+        {
+            Debug.LogError("服务器返回失败");
+            RaiseRequestEnded();
+            callback(false, null);
+            yield break;
+        }
+
+        string folder = DataPath.CityEvents;
+        Directory.CreateDirectory(folder);
+
+        var savedPaths = new Dictionary<string, string>();
+
+        foreach (var kvp in res.CityEvents)
+        {
+            string day = kvp.Key.ToLower();
+            string filename = day + ".json";
+
+            string path = Path.Combine(folder, filename);
+
+            string jsonText = JsonConvert.SerializeObject(kvp.Value, Formatting.Indented);
+
+            File.WriteAllText(path, jsonText);
+
+            savedPaths[day] = path;
+        }
+
+        Debug.Log("CityEvents 下载完成");
+
+        RaiseRequestEnded();
+        callback(true, savedPaths);
     }
-    
 }

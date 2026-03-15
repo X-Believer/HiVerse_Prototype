@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using System.IO;
+using Newtonsoft.Json;
 
 public class BuildingManager : MonoBehaviour
 {
@@ -54,12 +55,12 @@ public class BuildingManager : MonoBehaviour
 
         string json = File.ReadAllText(path);
 
-        CityEventConfigList data =
-            JsonUtility.FromJson<CityEventConfigList>(json);
+        List<CityEventConfig> data =
+            JsonConvert.DeserializeObject<List<CityEventConfig>>(json);
 
         todayEvents.Clear();
 
-        foreach (var cfg in data.events)
+        foreach (var cfg in data)
         {
             Building building = FindBuilding(cfg.buildingName);
 
@@ -106,6 +107,7 @@ public class BuildingManager : MonoBehaviour
     {
         int currentTime = WorldClock.Instance.CurrentTotalMinutes % 1440;
 
+        
         foreach (var e in todayEvents)
         {
             if (!e.started && currentTime >= e.startTime)
@@ -134,11 +136,8 @@ public class BuildingManager : MonoBehaviour
     
     string GetTodayEventFileName()
     {
-        string fileName =
-            WorldClock.Instance.CurrentDayOfWeek
-                .ToString()
-                .ToLower() + ".json";
-
-        return Path.Combine(DataPath.CityEvents, fileName);
+        return WorldClock.Instance.CurrentDayOfWeek
+            .ToString()
+            .ToLower() + ".json";
     }
 }
