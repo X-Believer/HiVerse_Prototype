@@ -55,7 +55,7 @@ public class GameDataInitializer : MonoBehaviour
         if (!serverAvailable)
         {
             Debug.LogWarning("服务器不可用，拷贝 StreamingAssets 测试数据");
-            CopyDirectory(Application.streamingAssetsPath, Application.persistentDataPath);
+            // CopyDirectory(Application.streamingAssetsPath, Application.persistentDataPath);
             yield break;
         }
 

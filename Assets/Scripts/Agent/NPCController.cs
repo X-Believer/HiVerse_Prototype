@@ -149,6 +149,7 @@ public class NPCController : MonoBehaviour, IMarkerTarget
         }
 
         Debug.Log($"{npcName} 开始前往: {item.action}");
+        NewsSource.Instance.AddCitizenAction(npcName, item.action);
     }
     public string GetCurrentActionDescription()
     {

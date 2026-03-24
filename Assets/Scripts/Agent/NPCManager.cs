@@ -53,6 +53,9 @@ public class NPCManager : MonoBehaviour
 
     public Vector3 NPCStartPosition;
     public NPCSpeed NPCSpeed = NPCSpeed.Normal;
+    
+    [Header("NPC Mesh Presets")]
+    public Mesh[] npcMeshes;
 
     [Header("NPC Container")]
     public Transform agentsRoot;
@@ -189,6 +192,8 @@ public class NPCManager : MonoBehaviour
             Quaternion.identity,
             agentsRoot
         );
+        
+        ApplyRandomMesh(obj);
 
         NPCController npc = obj.GetComponent<NPCController>();
 
@@ -205,6 +210,36 @@ public class NPCManager : MonoBehaviour
 
         return npc;
     }
+    
+    void ApplyRandomMesh(GameObject obj)
+    {
+        if (npcMeshes == null || npcMeshes.Length == 0)
+        {
+            Debug.LogWarning("npcMeshes 未配置，无法随机替换 Mesh");
+            return;
+        }
+
+        // 找到角色身上的 SkinnedMeshRenderer
+        SkinnedMeshRenderer smr = obj.GetComponentInChildren<SkinnedMeshRenderer>();
+        if (smr == null)
+        {
+            Debug.LogWarning($"对象 {obj.name} 上未找到 SkinnedMeshRenderer");
+            return;
+        }
+
+        // 随机选择一个 Mesh
+        int index = UnityEngine.Random.Range(0, npcMeshes.Length);
+        Mesh selectedMesh = npcMeshes[index];
+
+        if (selectedMesh == null)
+        {
+            Debug.LogWarning($"npcMeshes[{index}] 为空");
+            return;
+        }
+
+        smr.sharedMesh = selectedMesh;
+    }
+
 
     // ======================
     // 注册 / 注销 NPC
